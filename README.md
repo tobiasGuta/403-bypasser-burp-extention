@@ -18,3 +18,8 @@ helpers so it’s robust, not hacky.
 
 **Quick usage**\
 Drop the file into Burp Extender (Python/Jython) -> open **Extender -> 403 Bypasser** -> enqueue requests or use context menu -> hit Start.
+
+# Demo
+
+https://github.com/user-attachments/assets/6516c85c-b7b2-45c5-a7c4-77afccc62d11
+
