@@ -260,6 +260,10 @@ class BurpExtender(IBurpExtender):
         # keep a small spacer so layout remains stable
         controls.add(swing.JLabel(""), gbc)
         gbc.gridx += 1
+        # Clear log / history button
+        self.clear_btn = swing.JButton('Clear Log', actionPerformed=self.clear_clicked)
+        controls.add(self.clear_btn, gbc)
+        gbc.gridx += 1
 
         # --- QUEUE UI (top) ---
         queue_cols = ['Queued URL', 'Method', 'Status', 'Source']
@@ -551,6 +555,124 @@ class BurpExtender(IBurpExtender):
         except:
             pass
         return
+
+    def clear_clicked(self, event):
+        """
+        Clear UI history: queued jobs, results table, result_items, reset queue label,
+        and also clear request/response editors (if present).
+        Runs on EDT.
+        """
+        def do_clear():
+            try:
+                # clear backend queues
+                try:
+                    self.jobs = []
+                except:
+                    pass
+                try:
+                    self.result_items = []
+                except:
+                    pass
+
+                # clear queue table model
+                try:
+                    while self.queue_model.getRowCount() > 0:
+                        self.queue_model.removeRow(0)
+                except:
+                    try:
+                        self.queue_model.setRowCount(0)
+                    except:
+                        pass
+
+                # clear results table model
+                try:
+                    while self.table_model.getRowCount() > 0:
+                        self.table_model.removeRow(0)
+                except:
+                    try:
+                        self.table_model.setRowCount(0)
+                    except:
+                        pass
+
+                # prepare empty payload for editors (use helpers if available)
+                try:
+                    empty_bytes = self._helpers.stringToBytes("") if getattr(self, '_helpers', None) else ""
+                except:
+                    empty_bytes = ""
+
+                # clear request editor (Burp message editor or fallback component)
+                try:
+                    if getattr(self, 'reqEditor', None):
+                        try:
+                            # set an explicit empty message (some editors ignore None)
+                            self.reqEditor.setMessage(empty_bytes, True)
+                        except:
+                            # fallback to clearing the editor component text
+                            try:
+                                comp = self.reqEditor.getComponent()
+                                if hasattr(comp, 'setText'):
+                                    comp.setText("")
+                            except:
+                                pass
+                    else:
+                        comp = getattr(self, 'request_pane', None)
+                        if comp is not None:
+                            try:
+                                if hasattr(comp, 'setMessage'):
+                                    comp.setMessage(empty_bytes, True)
+                                elif hasattr(comp, 'setText'):
+                                    comp.setText("")
+                            except:
+                                pass
+                        # also clear any edit-pane variant
+                        try:
+                            if getattr(self, 'request_pane_edit', None) and hasattr(self.request_pane_edit, 'setText'):
+                                self.request_pane_edit.setText("")
+                        except:
+                            pass
+                except:
+                    pass
+
+                # clear response editor (Burp message editor or fallback component)
+                try:
+                    if getattr(self, 'respEditor', None):
+                        try:
+                            self.respEditor.setMessage(empty_bytes, False)
+                        except:
+                            try:
+                                comp = self.respEditor.getComponent()
+                                if hasattr(comp, 'setText'):
+                                    comp.setText("")
+                            except:
+                                pass
+                    else:
+                        comp = getattr(self, 'response_pane', None)
+                        if comp is not None:
+                            try:
+                                if hasattr(comp, 'setMessage'):
+                                    comp.setMessage(empty_bytes, False)
+                                elif hasattr(comp, 'setText'):
+                                    comp.setText("")
+                            except:
+                                pass
+                except:
+                    pass
+
+                # reset queue label
+                try:
+                    self.queue_label.setText("Queued URL: <none>")
+                except:
+                    pass
+
+                self.stdout.println("[UI] Cleared log/history (editors cleared)")
+            except Exception:
+                try:
+                    self.stderr.println("[UI] clear_clicked exception")
+                    self.stderr.println(traceback.format_exc())
+                except:
+                    pass
+
+        SwingUtilities.invokeLater(FuncRunnable(do_clear))
 
     def add_result(self, url, kind, payload, code, confidence, http_rr):
         # called by worker thread — must update Swing on EDT
